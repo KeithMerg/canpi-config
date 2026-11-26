@@ -15,7 +15,7 @@
 //  30 November, 2021 - E M Thornber
 //
 
-use ini::{EscapePolicy, Ini};
+use ini::{EscapePolicy, Ini, ParseOption};
 
 use schemars::Schema;
 use schemars::{schema_for, JsonSchema};
@@ -34,6 +34,15 @@ use log::{error, info, warn};
 
 use slugrs::slugify;
 use thiserror::Error;
+
+/// canpid and the control scripts read values as they are, so backslashes are neither
+/// interpreted when the file is read nor added when it is written
+fn ini_parse_option() -> ParseOption {
+    ParseOption {
+        enabled_escape: false,
+        ..ParseOption::default()
+    }
+}
 
 fn create_json_schema(schema: Schema) -> Value {
     let schema_string = serde_json::to_string(&schema).unwrap();
@@ -284,7 +293,7 @@ impl Cfg {
     /// Properties from the general section
     pub fn read_cfg_file<P: AsRef<Path> + std::fmt::Display>(path: P) -> Result<IniHash, CfgError> {
         // Read existing configuration file
-        let f = Ini::load_from_file(&path);
+        let f = Ini::load_from_file_opt(&path, ini_parse_option());
         match f {
             Ok(ini) => {
                 // create new IniHash to hold .ini file contents
@@ -339,7 +348,7 @@ impl Cfg {
         }
         // Start from the file as it is now
         let mut ini = if path.exists() {
-            match Ini::load_from_file(path) {
+            match Ini::load_from_file_opt(path, ini_parse_option()) {
                 Ok(ini) => ini,
                 Err(e) => {
                     error!(
@@ -360,7 +369,7 @@ impl Cfg {
             }
         }
         let mut contents: Vec<u8> = Vec::new();
-        ini.write_to_policy(&mut contents, EscapePolicy::Basics)?;
+        ini.write_to_policy(&mut contents, EscapePolicy::Nothing)?;
 
         if make_backup.unwrap_or(false) && path.exists() {
             let backup = sibling_path(path, ".bak");

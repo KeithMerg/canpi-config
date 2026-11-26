@@ -286,3 +286,24 @@ fn save_replaces_file_and_keeps_backup() {
     teardown_file(&cfg_file);
     teardown_file(&defn_file);
 }
+
+#[test]
+/// Backslashes are read and written as they are, as canpid and the scripts read them
+fn save_keeps_backslashes() {
+    let (mut cfg, cfg_file, defn_file) = load_test_files(
+        "save_backslash_test",
+        "canid=101\nnode_number=5432\nstart_event_id=2\nnode_mode=1\nrouter_password=pa\\ss\n",
+    );
+    set_current(&mut cfg, "start_event_id", "x\\y");
+    cfg.write_cfg_file(&cfg_file, Some(false))
+        .expect("save failed");
+    let text = fs::read_to_string(&cfg_file).expect("file gone");
+    assert!(text.contains("router_password=pa\\ss\n"), "{}", text);
+    assert!(text.contains("start_event_id=x\\y\n"), "{}", text);
+    assert_eq!(
+        saved_value(&cfg_file, "router_password").as_deref(),
+        Some("pa\\ss")
+    );
+    teardown_file(&cfg_file);
+    teardown_file(&defn_file);
+}
